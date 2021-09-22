@@ -1,3 +1,47 @@
+//! # ssb-uri-rs
+//!
+//! Utilities for recognising and converting Secure Scuttlebutt (SSB) URIs.
+//!
+//! Written according to the [SSB URI Specification](https://github.com/ssb-ngi-pointer/ssb-uri-spec).
+//!
+//! ## Example
+//!
+//!```
+//! use anyhow::Result;
+//! use ssb_uri_rs;
+//!
+//! fn example() -> Result<()> {
+//!     let example_uri = "ssb:message/sha256/g3hPVPDEO1Aj_uPl0-J2NlhFB2bbFLIHlty-YuqFZ3w=";
+//!
+//!     assert!(ssb_uri_rs::is_classic_msg_uri(example_uri)?);
+//!
+//!     let example_sigil = ssb_uri_rs::msg_uri_to_sigil(example_uri)?;
+//!
+//!     assert_eq!(example_sigil, "%g3hPVPDEO1Aj/uPl0+J2NlhFB2bbFLIHlty+YuqFZ3w=.sha256");
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## Documentation
+//!
+//! Use `cargo doc` to generate and serve the Rust documentation for this library:
+//!
+//! ```bash
+//! git clone git@github.com:ssb-ngi-pointer/ssb-uri-rs.git
+//! cd ssb-uri-rs
+//! cargo doc --no-deps --open
+//! ```
+//!
+//! ## Related Work
+//!
+//! [ssb-uri2](https://github.com/staltz/ssb-uri2) - TypeScript version of this library
+//! [multiserver](https://github.com/ssb-js/multiserver) - JavaScript module
+//! [multiserver-address](https://github.com/ssbc/multiserver-address) - JavaScript module
+//!
+//! ## License
+//!
+//! LGPL-3.0.
 use anyhow::{anyhow, Result};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use regex::Regex;
@@ -5,16 +49,17 @@ use url::Url;
 
 /* HELPER FUNCTIONS */
 
-// the standard character set uses + and /
+/// Replace all instances of the URL-safe character set with the standard equivalent.
 pub fn safe_to_unsafe_base64(input: &str) -> String {
     input.replace("-", "+").replace("_", "/")
 }
 
-// the url safe character set uses - and _
+/// Replace all instance of the standard character set with the URL-safe equivalent.
 pub fn unsafe_to_safe_base64(input: &str) -> String {
     input.replace("+", "-").replace("/", "_")
 }
 
+/// Extract and return the base64 data from a URI pathname.
 pub fn extract_base64_data(pathname: &str) -> Result<Option<String>> {
     let re = Regex::new(r#"(:|/)([\w_\-=]+)$"#)?;
     // `caps` will be `None` if no capture is found (hence `Option` in return type)
@@ -29,6 +74,7 @@ pub fn extract_base64_data(pathname: &str) -> Result<Option<String>> {
 
 /* SSB URI TYPE AND FORMAT CHECKING FUNCTIONS */
 
+/// Ensure a URI is formatted according to the specification for the given `type` and `format`.
 pub fn check_type_format(uri: &str, uri_type: &str, uri_format: &str) -> Result<bool> {
     let parsed_uri = Url::parse(uri)?;
     if uri.starts_with(&format!("ssb:{}:{}:", uri_type, uri_format))
@@ -42,34 +88,42 @@ pub fn check_type_format(uri: &str, uri_type: &str, uri_format: &str) -> Result<
     }
 }
 
+/// Check whether the given URI is a classic feed URI.
 pub fn is_classic_feed_uri(uri: &str) -> Result<bool> {
     check_type_format(uri, "feed", "ed25519")
 }
 
+/// Check whether the given URI is a Bendy Butt feed URI.
 pub fn is_bendy_butt_v1_feed_uri(uri: &str) -> Result<bool> {
     check_type_format(uri, "feed", "bendybutt-v1")
 }
 
+/// Check whether the given URI is a Gabby Grove feed URI.
 pub fn is_gabby_grove_v1_feed_uri(uri: &str) -> Result<bool> {
     check_type_format(uri, "feed", "gabbygrove-v1")
 }
 
+/// Check whether the given URI is a classic message URI.
 pub fn is_classic_msg_uri(uri: &str) -> Result<bool> {
     check_type_format(uri, "message", "sha256")
 }
 
+/// Check whether the given URI is a Bendy Butt message URI.
 pub fn is_bendy_butt_v1_msg_uri(uri: &str) -> Result<bool> {
     check_type_format(uri, "message", "bendybutt-v1")
 }
 
+/// Check whether the given URI is a Gabby Grove message URI.
 pub fn is_gabby_grove_v1_msg_uri(uri: &str) -> Result<bool> {
     check_type_format(uri, "message", "gabbygrove-v1")
 }
 
+/// Check whether the given URI is a blob URI.
 pub fn is_blob_uri(uri: &str) -> Result<bool> {
     check_type_format(uri, "blob", "sha256")
 }
 
+/// Check whether the given URI is a multiserver address URI.
 pub fn is_multiserver_uri(uri: &str) -> Result<bool> {
     let parsed_uri = Url::parse(uri)?;
     let query = parsed_uri
@@ -88,14 +142,17 @@ pub fn is_multiserver_uri(uri: &str) -> Result<bool> {
     }
 }
 
+/// Check whether the given URI is an encryption key (box2 Diffie-Hellman) URI.
 pub fn is_encryption_key_box2_uri(uri: &str) -> Result<bool> {
     check_type_format(uri, "encryption-key", "box-dm-dh")
 }
 
+/// Check whether the given URI is an identity PO-box URI.
 pub fn is_identity_po_box_uri(uri: &str) -> Result<bool> {
     check_type_format(uri, "identity", "po-box")
 }
 
+/// Check whether the given URI is an experimental URI.
 pub fn is_experimental_uri(uri: &str) -> Result<bool> {
     if uri.starts_with("ssb:experimental") || uri.starts_with("ssb://experimental") {
         Ok(true)
@@ -104,6 +161,7 @@ pub fn is_experimental_uri(uri: &str) -> Result<bool> {
     }
 }
 
+/// Check whether the given URI matches any of the SSB URI specifications.
 pub fn is_ssb_uri(uri: &str) -> Result<bool> {
     if is_classic_feed_uri(uri)?
         || is_bendy_butt_v1_feed_uri(uri)?
@@ -143,6 +201,7 @@ pub fn is_experimental_uri_with_action(uri: &str, action: &str) -> Result<bool> 
 
 /* SSB URI CONVERSION FUNCTIONS */
 
+/// Convert a classic feed URI to a sigil-based (`@`) `ed25519` identifier.
 pub fn feed_uri_to_sigil(uri: &str) -> Result<String> {
     match is_classic_feed_uri(uri)? {
         true => {
@@ -160,8 +219,8 @@ pub fn feed_uri_to_sigil(uri: &str) -> Result<String> {
     }
 }
 
+/// Convert a classic message URI to a sigil-based (`%`) `sha256` identifier.
 pub fn msg_uri_to_sigil(uri: &str) -> Result<String> {
-    assert!(is_classic_msg_uri(uri)?);
     match is_classic_msg_uri(uri)? {
         true => {
             let parsed_uri = Url::parse(uri)?;
@@ -178,6 +237,7 @@ pub fn msg_uri_to_sigil(uri: &str) -> Result<String> {
     }
 }
 
+/// Convert a blob URI to a sigil-based (`&`) `sha256` identifier.
 pub fn blob_uri_to_sigil(uri: &str) -> Result<String> {
     match is_blob_uri(uri)? {
         true => {
@@ -195,6 +255,7 @@ pub fn blob_uri_to_sigil(uri: &str) -> Result<String> {
     }
 }
 
+/// Convert a multiserver address URI to a multiserver address.
 pub fn multiserver_uri_to_address(uri: &str) -> Result<String> {
     let parsed_uri = Url::parse(uri)?;
     let query = parsed_uri
@@ -212,6 +273,7 @@ pub fn multiserver_uri_to_address(uri: &str) -> Result<String> {
 
 /* SIGIL CONVERSION FUNCTIONS */
 
+/// Convert a sigil-based (`@`) `ed25519` feed identifier to a URI.
 pub fn feed_sigil_to_uri(sigil: &str) -> Result<String> {
     let data = &sigil
         .strip_suffix(".ed25519")
@@ -221,6 +283,7 @@ pub fn feed_sigil_to_uri(sigil: &str) -> Result<String> {
     Ok(format!("ssb:feed/ed25519/{}", base64_data))
 }
 
+/// Convert a sigil-based (`%`) `sha256` message identifier to a URI.
 pub fn msg_sigil_to_uri(sigil: &str) -> Result<String> {
     let data = &sigil
         .strip_suffix(".sha256")
@@ -229,6 +292,7 @@ pub fn msg_sigil_to_uri(sigil: &str) -> Result<String> {
     Ok(format!("ssb:message/sha256/{}", base64_data))
 }
 
+/// Convert a sigil-based (`&`) `sha256` blob identifier to a URI.
 pub fn blob_sigil_to_uri(sigil: &str) -> Result<String> {
     let data = &sigil
         .strip_suffix(".sha256")
@@ -239,6 +303,7 @@ pub fn blob_sigil_to_uri(sigil: &str) -> Result<String> {
 
 /* MULTISERVER ADDRESS CONVERSION FUNCTION */
 
+/// Convert a multiserver address to a URI.
 pub fn multiserver_address_to_uri(ms_addr: &str) -> String {
     let encoded = utf8_percent_encode(ms_addr, NON_ALPHANUMERIC).to_string();
     format!("ssb:address/multiserver?multiserverAddress={}", encoded)
