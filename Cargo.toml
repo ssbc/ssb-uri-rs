@@ -1,0 +1,16 @@
+[package]
+name = "ssb-uri-rs"
+version = "0.1.0"
+authors = ["Andrew Reid <glyph@mycelial.technology>"]
+description = "Utilities for recognising and converting Secure Scuttlebutt (SSB) URIs"
+edition = "2021"
+keywords = ["ssb", "scuttlebutt", "uri", "sigil"]
+license = "LGPL-3.0"
+readme = "README.md"
+repository = "https://github.com/ssb-ngi-pointer/ssb-uri-rs"
+
+[dependencies]
+anyhow = "1.0.44"
+percent-encoding = "2.1.0"
+regex = "1.5"
+url = "2.2.2"
