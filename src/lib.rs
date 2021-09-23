@@ -193,23 +193,18 @@ pub fn is_ssb_uri(uri: &str) -> Result<bool> {
     }
 }
 
-/* TODO: fix this
 pub fn is_experimental_uri_with_action(uri: &str, action: &str) -> Result<bool> {
     let parsed_uri = Url::parse(uri)?;
-    let query = parsed_uri
-        .query()
-        .ok_or(anyhow!("uri does not include a query string: {}", uri))?;
+    let mut query_pairs = parsed_uri.query_pairs().into_owned();
 
-    let query_pairs = parsed_uri.query_pairs().into_owned();
-
-    if is_experimental_uri(uri)? == true && query_pairs.find(|x| x == &("action".to_string(), action.to_string()).is_some() {
-
+    if is_experimental_uri(uri)?
+        && query_pairs.any(|x| x == ("action".to_string(), action.to_string()))
+    {
         Ok(true)
     } else {
         Ok(false)
     }
 }
-*/
 
 /* SSB URI CONVERSION FUNCTIONS */
 
@@ -338,7 +333,7 @@ pub fn multiserver_address_to_uri(ms_addr: &str) -> String {
 mod tests {
     mod fixtures;
 
-    use crate::tests::fixtures::{ADDRESS_URIS, BLOB_URIS, FEED_URIS, MSG_URIS};
+    use crate::tests::fixtures::{ADDRESS_URIS, BLOB_URIS, EXPERIMENTAL_URIS, FEED_URIS, MSG_URIS};
     use crate::*;
 
     #[test]
@@ -502,5 +497,25 @@ mod tests {
         let sigil = multiserver_uri_to_address(ADDRESS_URIS[1].1);
         assert!(sigil.is_ok());
         assert_eq!(sigil.unwrap(), ADDRESS_URIS[0].1);
+    }
+
+    #[test]
+    fn experimental_uris_recognised() {
+        let ssb_result = is_ssb_uri(EXPERIMENTAL_URIS[0].1);
+        assert!(ssb_result.is_ok());
+        assert_eq!(ssb_result.unwrap(), true);
+
+        for i in 0..1 {
+            let result = is_experimental_uri(EXPERIMENTAL_URIS[i].1);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), true)
+        }
+    }
+
+    #[test]
+    fn experimental_uris_with_action_recognised() {
+        let result = is_experimental_uri_with_action(EXPERIMENTAL_URIS[0].1, "claim-http-invite");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), true)
     }
 }

@@ -82,9 +82,7 @@ pub const ADDRESS_URIS: [(&str, &str); 4] = [
     ("uri3", "ssb://address/multiserver?multiserverAddress=net%3Awx.larpa.net%3A8008~shs%3ADTNmX%2B4SjsgZ7xyDh5xxmNtFqa6pWi5Qtw7cE8aR9TQ%3D"),
 ];
 
-/*
 pub const EXPERIMENTAL_URIS: [(&str, &str); 2] = [
     ("httpInviteUri", "ssb://experimental/?action=claim-http-invite&invite=39c0ac1850ec9af14f1bb73&postTo=https%3A%2F%2Fscuttlebutt.eu%2Fclaiminvite"),
     ("httpInviteUri2", "ssb:experimental/?action=claim-http-invite&invite=39c0ac1850ec9af14f1bb73&postTo=https%3A%2F%2Fscuttlebutt.eu%2Fclaiminvite"),
 ];
-*/
