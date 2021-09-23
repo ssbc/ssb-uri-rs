@@ -193,6 +193,8 @@ pub fn is_ssb_uri(uri: &str) -> Result<bool> {
     }
 }
 
+/// Check whether the given URI is an experimental URI with an `action` query parameter matching
+/// the given action.
 pub fn is_experimental_uri_with_action(uri: &str, action: &str) -> Result<bool> {
     let parsed_uri = Url::parse(uri)?;
     let mut query_pairs = parsed_uri.query_pairs().into_owned();
@@ -325,9 +327,51 @@ pub fn multiserver_address_to_uri(ms_addr: &str) -> String {
     format!("ssb:address/multiserver?multiserverAddress={}", encoded)
 }
 
-/* TODO: Validation */
+/* COMPOSITION AND DECOMPOSITION FUNCTIONS */
 
-/* TODO: Composition and decomposition */
+pub struct Parts {
+    // `type` is a reserved word in Rust (the underscore is a hack)
+    pub type_: String,
+    pub format: String,
+    pub data: String,
+}
+
+/*
+enum CanonicalParts {
+    FeedTF(Parts),
+    MessageTF(Parts),
+    BlobTF(Parts),
+    AddressTF(Parts),
+    EncryptionKeyTF(Parts),
+    IdentityTF(Parts),
+}
+*/
+
+/// Compose a new URI from the given parts: `type`, `format`, `data`.
+pub fn compose_uri(parts: Parts) -> Result<String> {
+    // TODO: validate parts
+    let base64_data = unsafe_to_safe_base64(&parts.data);
+    Ok(format!(
+        "ssb:{}/{}/{}",
+        parts.type_, parts.format, base64_data
+    ))
+}
+
+/// Decompose the given URI into its constituent parts: `type`, `format`, `data`.
+pub fn decompose_uri(uri: &str) -> Result<Parts> {
+    let parsed_uri = Url::parse(uri)?;
+    let pathname = parsed_uri.path();
+    let parts_vec: Vec<&str> = pathname.split('/').collect();
+    let parts = Parts {
+        type_: parts_vec[0].to_string(),
+        format: parts_vec[1].to_string(),
+        data: safe_to_unsafe_base64(parts_vec[2]),
+    };
+    // TODO: validate parts
+    Ok(parts)
+}
+
+/* TODO: Validation */
 
 #[cfg(test)]
 mod tests {
@@ -517,5 +561,37 @@ mod tests {
         let result = is_experimental_uri_with_action(EXPERIMENTAL_URIS[0].1, "claim-http-invite");
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), true)
+    }
+
+    #[test]
+    fn compose_works() {
+        let parts = Parts {
+            type_: "message".to_string(),
+            format: "sha256".to_string(),
+            data: "g3hPVPDEO1Aj/uPl0+J2NlhFB2bbFLIHlty+YuqFZ3w=".to_string(),
+        };
+        let uri = compose_uri(parts);
+        assert!(uri.is_ok());
+        assert_eq!(uri.unwrap(), MSG_URIS[1].1)
+    }
+
+    #[test]
+    fn decompose_works() {
+        let parts_result = decompose_uri(MSG_URIS[1].1);
+        assert!(parts_result.is_ok());
+        let parts = parts_result.unwrap();
+        assert_eq!(parts.type_, "message");
+        assert_eq!(parts.format, "sha256");
+        assert_eq!(parts.data, "g3hPVPDEO1Aj/uPl0+J2NlhFB2bbFLIHlty+YuqFZ3w=");
+    }
+
+    #[test]
+    fn compose_and_decompose() {
+        let parts_result = decompose_uri(MSG_URIS[1].1);
+        let parts = parts_result.unwrap();
+        let uri_result = compose_uri(parts);
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
+        assert_eq!(uri, MSG_URIS[1].1);
     }
 }
