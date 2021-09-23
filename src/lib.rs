@@ -59,12 +59,79 @@ const ENCODE_URI_COMPONENT_SET: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'(')
     .remove(b')');
 
+const FEED_FORMATS: [&str; 3] = ["ed25519", "bendybutt-v1", "gabbygrove-v1"];
+const MSG_FORMATS: [&str; 3] = ["sha256", "bendybutt-v1", "gabbygrove-v1"];
+
 /// Data representation for a TFD (`type`, `format`, `data`) identity.
 pub struct Parts {
     // `type` is a reserved word in Rust (the underscore is a sketchy workaround)
     pub type_: String,
     pub format: String,
     pub data: String,
+}
+
+/// Check whether the `type` and `format` of the given `Parts` `struct` represent a canonical
+/// pairing.
+impl Parts {
+    fn validate(&self) -> Result<bool> {
+        match self.type_.as_str() {
+            "feed" => {
+                if !FEED_FORMATS.contains(&self.format.as_str()) {
+                    Err(anyhow!("unknown format for type 'feed': {}", &self.format))
+                } else {
+                    Ok(true)
+                }
+            }
+            "message" => {
+                if !MSG_FORMATS.contains(&self.format.as_str()) {
+                    Err(anyhow!(
+                        "unknown format for type 'message': {}",
+                        &self.format
+                    ))
+                } else {
+                    Ok(true)
+                }
+            }
+            "blob" => {
+                if self.format.as_str() != "sha256" {
+                    Err(anyhow!("unknown format for type 'blob': {}", &self.format))
+                } else {
+                    Ok(true)
+                }
+            }
+            "address" => {
+                if self.format.as_str() != "multiserver" {
+                    Err(anyhow!(
+                        "unknown format for type 'address': {}",
+                        &self.format
+                    ))
+                } else {
+                    Ok(true)
+                }
+            }
+            "encryption-key" => {
+                if self.format.as_str() != "box2-dm-dh" {
+                    Err(anyhow!(
+                        "unknown format for type 'encryption-key': {}",
+                        &self.format
+                    ))
+                } else {
+                    Ok(true)
+                }
+            }
+            "identity" => {
+                if self.format.as_str() != "po-box" {
+                    Err(anyhow!(
+                        "unknown format for type 'identity': {}",
+                        &self.format
+                    ))
+                } else {
+                    Ok(true)
+                }
+            }
+            _ => return Err(anyhow!("unknown type: {}", &self.type_)),
+        }
+    }
 }
 
 /* HELPER FUNCTIONS */
@@ -335,78 +402,11 @@ pub fn multiserver_address_to_uri(ms_addr: &str) -> String {
     format!("ssb:address/multiserver?multiserverAddress={}", encoded)
 }
 
-/* VALIDATION FUNCTION */
-
-/// Check whether the `type` and `format` of the given `Parts` `struct` represent a canonical
-/// pairing.
-pub fn validate_parts(parts: &Parts) -> Result<bool> {
-    const FEED_FORMATS: [&str; 3] = ["ed25519", "bendybutt-v1", "gabbygrove-v1"];
-    const MSG_FORMATS: [&str; 3] = ["sha256", "bendybutt-v1", "gabbygrove-v1"];
-
-    match parts.type_.as_str() {
-        "feed" => {
-            if !FEED_FORMATS.contains(&parts.format.as_str()) {
-                Err(anyhow!("unknown format for type 'feed': {}", parts.format))
-            } else {
-                Ok(true)
-            }
-        }
-        "message" => {
-            if !MSG_FORMATS.contains(&parts.format.as_str()) {
-                Err(anyhow!(
-                    "unknown format for type 'message': {}",
-                    parts.format
-                ))
-            } else {
-                Ok(true)
-            }
-        }
-        "blob" => {
-            if parts.format.as_str() != "sha256" {
-                Err(anyhow!("unknown format for type 'blob': {}", parts.format))
-            } else {
-                Ok(true)
-            }
-        }
-        "address" => {
-            if parts.format.as_str() != "multiserver" {
-                Err(anyhow!(
-                    "unknown format for type 'address': {}",
-                    parts.format
-                ))
-            } else {
-                Ok(true)
-            }
-        }
-        "encryption-key" => {
-            if parts.format.as_str() != "box2-dm-dh" {
-                Err(anyhow!(
-                    "unknown format for type 'encryption-key': {}",
-                    parts.format
-                ))
-            } else {
-                Ok(true)
-            }
-        }
-        "identity" => {
-            if parts.format.as_str() != "po-box" {
-                Err(anyhow!(
-                    "unknown format for type 'identity': {}",
-                    parts.format
-                ))
-            } else {
-                Ok(true)
-            }
-        }
-        _ => return Err(anyhow!("unknown type: {}", parts.type_)),
-    }
-}
-
 /* COMPOSITION AND DECOMPOSITION FUNCTIONS */
 
 /// Compose a new URI from the given parts: `type`, `format`, `data`.
 pub fn compose_uri(parts: Parts) -> Result<String> {
-    validate_parts(&parts)?;
+    parts.validate()?;
     let base64_data = unsafe_to_safe_base64(&parts.data);
     Ok(format!(
         "ssb:{}/{}/{}",
@@ -424,7 +424,7 @@ pub fn decompose_uri(uri: &str) -> Result<Parts> {
         format: parts_vec[1].to_string(),
         data: safe_to_unsafe_base64(parts_vec[2]),
     };
-    validate_parts(&parts)?;
+    parts.validate()?;
     Ok(parts)
 }
 
