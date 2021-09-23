@@ -59,6 +59,14 @@ const ENCODE_URI_COMPONENT_SET: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'(')
     .remove(b')');
 
+/// Data representation for a TFD (`type`, `format`, `data`) identity.
+pub struct Parts {
+    // `type` is a reserved word in Rust (the underscore is a sketchy workaround)
+    pub type_: String,
+    pub format: String,
+    pub data: String,
+}
+
 /* HELPER FUNCTIONS */
 
 /// Replace all instances of the URL-safe character set with the standard equivalent.
@@ -87,11 +95,11 @@ pub fn extract_base64_data(pathname: &str) -> Result<Option<String>> {
 /* SSB URI TYPE AND FORMAT CHECKING FUNCTIONS */
 
 /// Ensure a URI is formatted according to the specification for the given `type` and `format`.
-pub fn check_type_format(uri: &str, uri_type: &str, uri_format: &str) -> Result<bool> {
+pub fn check_type_format(uri: &str, type_: &str, format: &str) -> Result<bool> {
     let parsed_uri = Url::parse(uri)?;
-    if uri.starts_with(&format!("ssb:{}:{}:", uri_type, uri_format))
-        || uri.starts_with(&format!("ssb:{}/{}/", uri_type, uri_format))
-        || uri.starts_with(&format!("ssb://{}/{}/", uri_type, uri_format))
+    if uri.starts_with(&format!("ssb:{}:{}:", type_, format))
+        || uri.starts_with(&format!("ssb:{}/{}/", type_, format))
+        || uri.starts_with(&format!("ssb://{}/{}/", type_, format))
             && extract_base64_data(parsed_uri.path())?.is_some()
     {
         Ok(true)
@@ -327,29 +335,78 @@ pub fn multiserver_address_to_uri(ms_addr: &str) -> String {
     format!("ssb:address/multiserver?multiserverAddress={}", encoded)
 }
 
+/* VALIDATION FUNCTION */
+
+/// Check whether the `type` and `format` of the given `Parts` `struct` represent a canonical
+/// pairing.
+pub fn validate_parts(parts: &Parts) -> Result<bool> {
+    const FEED_FORMATS: [&str; 3] = ["ed25519", "bendybutt-v1", "gabbygrove-v1"];
+    const MSG_FORMATS: [&str; 3] = ["sha256", "bendybutt-v1", "gabbygrove-v1"];
+
+    match parts.type_.as_str() {
+        "feed" => {
+            if !FEED_FORMATS.contains(&parts.format.as_str()) {
+                Err(anyhow!("unknown format for type 'feed': {}", parts.format))
+            } else {
+                Ok(true)
+            }
+        }
+        "message" => {
+            if !MSG_FORMATS.contains(&parts.format.as_str()) {
+                Err(anyhow!(
+                    "unknown format for type 'message': {}",
+                    parts.format
+                ))
+            } else {
+                Ok(true)
+            }
+        }
+        "blob" => {
+            if parts.format.as_str() != "sha256" {
+                Err(anyhow!("unknown format for type 'blob': {}", parts.format))
+            } else {
+                Ok(true)
+            }
+        }
+        "address" => {
+            if parts.format.as_str() != "multiserver" {
+                Err(anyhow!(
+                    "unknown format for type 'address': {}",
+                    parts.format
+                ))
+            } else {
+                Ok(true)
+            }
+        }
+        "encryption-key" => {
+            if parts.format.as_str() != "box2-dm-dh" {
+                Err(anyhow!(
+                    "unknown format for type 'encryption-key': {}",
+                    parts.format
+                ))
+            } else {
+                Ok(true)
+            }
+        }
+        "identity" => {
+            if parts.format.as_str() != "po-box" {
+                Err(anyhow!(
+                    "unknown format for type 'identity': {}",
+                    parts.format
+                ))
+            } else {
+                Ok(true)
+            }
+        }
+        _ => return Err(anyhow!("unknown type: {}", parts.type_)),
+    }
+}
+
 /* COMPOSITION AND DECOMPOSITION FUNCTIONS */
-
-pub struct Parts {
-    // `type` is a reserved word in Rust (the underscore is a hack)
-    pub type_: String,
-    pub format: String,
-    pub data: String,
-}
-
-/*
-enum CanonicalParts {
-    FeedTF(Parts),
-    MessageTF(Parts),
-    BlobTF(Parts),
-    AddressTF(Parts),
-    EncryptionKeyTF(Parts),
-    IdentityTF(Parts),
-}
-*/
 
 /// Compose a new URI from the given parts: `type`, `format`, `data`.
 pub fn compose_uri(parts: Parts) -> Result<String> {
-    // TODO: validate parts
+    validate_parts(&parts)?;
     let base64_data = unsafe_to_safe_base64(&parts.data);
     Ok(format!(
         "ssb:{}/{}/{}",
@@ -367,11 +424,9 @@ pub fn decompose_uri(uri: &str) -> Result<Parts> {
         format: parts_vec[1].to_string(),
         data: safe_to_unsafe_base64(parts_vec[2]),
     };
-    // TODO: validate parts
+    validate_parts(&parts)?;
     Ok(parts)
 }
-
-/* TODO: Validation */
 
 #[cfg(test)]
 mod tests {
