@@ -164,10 +164,12 @@ pub fn extract_base64_data(pathname: &str) -> Result<Option<String>> {
 /// Ensure a URI is formatted according to the specification for the given `type` and `format`.
 pub fn check_type_format(uri: &str, type_: &str, format: &str) -> Result<bool> {
     let parsed_uri = Url::parse(uri)?;
-    if uri.starts_with(&format!("ssb:{}:{}:", type_, format))
+    let base64_data = extract_base64_data(parsed_uri.path())?;
+
+    if (uri.starts_with(&format!("ssb:{}:{}:", type_, format))
         || uri.starts_with(&format!("ssb:{}/{}/", type_, format))
-        || uri.starts_with(&format!("ssb://{}/{}/", type_, format))
-            && extract_base64_data(parsed_uri.path())?.is_some()
+        || uri.starts_with(&format!("ssb://{}/{}/", type_, format)))
+        && base64_data.is_some()
     {
         Ok(true)
     } else {
@@ -435,6 +437,8 @@ mod tests {
     use crate::tests::fixtures::{ADDRESS_URIS, BLOB_URIS, EXPERIMENTAL_URIS, FEED_URIS, MSG_URIS};
     use crate::*;
 
+    /* HAPPY PATH TESTS */
+
     #[test]
     fn safe_to_unsafe() {
         let safe_uri = "g3hPVPDEO1Aj_uPl0-J2NlhFB2bbFLIHlty-YuqFZ3w=";
@@ -648,5 +652,103 @@ mod tests {
         assert!(uri_result.is_ok());
         let uri = uri_result.unwrap();
         assert_eq!(uri, MSG_URIS[1].1);
+    }
+
+    /* SAD PATH TESTS */
+
+    #[test]
+    fn msg_uri_not_recognised_as_feed_uri() {
+        let result = is_classic_feed_uri(MSG_URIS[1].1);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), false);
+    }
+
+    #[test]
+    fn cannot_convert_bb_msg_to_sigil() {
+        match msg_uri_to_sigil(MSG_URIS[4].1) {
+                Err(e) => assert_eq!(e.to_string(), "uri is not type `message` and format `sha256`: ssb://message/bendybutt-v1/Z0rMVMDEO1Aj0uPl0_J2NlhFB2bbFLIHlty_YuqArFq="),
+                _ => panic!()
+            }
+    }
+
+    #[test]
+    fn cannot_convert_gg_msg_to_sigil() {
+        match msg_uri_to_sigil(MSG_URIS[5].1) {
+                Err(e) => assert_eq!(e.to_string(), "uri is not type `message` and format `sha256`: ssb:message/gabbygrove-v1/QibgMEFVrupoOpiILKVoNXnhzdVQVZf7dkmL9MSXO5g="),
+                _ => panic!()
+            }
+    }
+
+    #[test]
+    fn invalid_feed_uri_not_recognised() {
+        let result = is_classic_feed_uri("ssb:feed/ed25519/");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), false);
+    }
+
+    #[test]
+    fn cannot_convert_invalid_feed_uri_to_sigil() {
+        match feed_uri_to_sigil("ssb:") {
+            Err(e) => assert_eq!(
+                e.to_string(),
+                "uri is not type `feed` and format `ed25519`: ssb:"
+            ),
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn cannot_convert_bb_feed_uri_to_sigil() {
+        match feed_uri_to_sigil(FEED_URIS[4].1) {
+            Err(e) => assert_eq!(
+                e.to_string(),
+                "uri is not type `feed` and format `ed25519`: ssb:feed/bendybutt-v1/APaWWDs8g73EZFUMfW37RBULtFEjwKNbDczvdYiRXtA=",
+            ),
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn cannot_convert_gg_feed_uri_to_sigil() {
+        match feed_uri_to_sigil(FEED_URIS[5].1) {
+            Err(e) => assert_eq!(
+                e.to_string(),
+                "uri is not type `feed` and format `ed25519`: ssb:feed/gabbygrove-v1/FY5OG311W4j_KPh8H9B2MZt4WSziy_p-ABkKERJdujQ=",
+            ),
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn cannot_convert_invalid_msg_uri_to_sigil() {
+        match msg_uri_to_sigil("ssb:") {
+            Err(e) => assert_eq!(
+                e.to_string(),
+                "uri is not type `message` and format `sha256`: ssb:"
+            ),
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn cannot_convert_invalid_blob_uri_to_sigil() {
+        match blob_uri_to_sigil("ssb:") {
+            Err(e) => assert_eq!(
+                e.to_string(),
+                "uri is not of type `blob` and format `sha256`: ssb:"
+            ),
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn invalid_multiserver_uri_not_recognised() {
+        match is_multiserver_uri("ssb:address/multiserver/") {
+            Err(e) => assert_eq!(
+                e.to_string(),
+                "uri does not include a query string: ssb:address/multiserver/"
+            ),
+            _ => panic!(),
+        }
     }
 }
