@@ -43,9 +43,21 @@
 //!
 //! LGPL-3.0.
 use anyhow::{anyhow, Result};
-use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use percent_encoding::{percent_decode, utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use regex::Regex;
 use url::Url;
+
+/// An ASCII character set which matches that used by `encodeURIComponent()` in JavaScript. Includes all characters except: `A-Z a-z 0-9 - _ . ! ~ * ' ( )`.
+const ENCODE_URI_COMPONENT_SET: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'_')
+    .remove(b'.')
+    .remove(b'!')
+    .remove(b'~')
+    .remove(b'*')
+    .remove(b'\'')
+    .remove(b'(')
+    .remove(b')');
 
 /* HELPER FUNCTIONS */
 
@@ -227,7 +239,7 @@ pub fn msg_uri_to_sigil(uri: &str) -> Result<String> {
             let base64_data = extract_base64_data(parsed_uri.path())?;
             match base64_data {
                 Some(data) => Ok(format!("%{}.sha256", data)),
-                None => Err(anyhow!("unable to extract base64 data from uri: {}", uri)),
+                None => Err(anyhow!("failed to extract base64 data from uri: {}", uri)),
             }
         }
         false => Err(anyhow!(
@@ -245,7 +257,7 @@ pub fn blob_uri_to_sigil(uri: &str) -> Result<String> {
             let base64_data = extract_base64_data(parsed_uri.path())?;
             match base64_data {
                 Some(data) => Ok(format!("&{}.sha256", data)),
-                None => Err(anyhow!("unable to extract base64 data from uri: {}", uri)),
+                None => Err(anyhow!("failed to extract base64 data from uri: {}", uri)),
             }
         }
         false => Err(anyhow!(
@@ -262,8 +274,17 @@ pub fn multiserver_uri_to_address(uri: &str) -> Result<String> {
         .query()
         .ok_or_else(|| anyhow!("uri does not include a query string: {}", uri))?;
 
-    match query.starts_with("multiserverAddress") {
-        true => Ok(query.to_string()),
+    match query.starts_with("multiserverAddress=") {
+        true => {
+            let ms_addr = query.strip_prefix("multiserverAddress=").ok_or_else(|| {
+                anyhow!(
+                    "failed to strip prefix from multiserver address uri query: {}",
+                    uri
+                )
+            })?;
+            let ms_addr_decoded = percent_decode(ms_addr.as_bytes()).decode_utf8()?;
+            Ok(ms_addr_decoded.to_string())
+        }
         false => Err(anyhow!(
             "uri query string does not start with `multiserverAddress`: {}",
             uri
@@ -305,7 +326,7 @@ pub fn blob_sigil_to_uri(sigil: &str) -> Result<String> {
 
 /// Convert a multiserver address to a URI.
 pub fn multiserver_address_to_uri(ms_addr: &str) -> String {
-    let encoded = utf8_percent_encode(ms_addr, NON_ALPHANUMERIC).to_string();
+    let encoded = utf8_percent_encode(ms_addr, ENCODE_URI_COMPONENT_SET).to_string();
     format!("ssb:address/multiserver?multiserverAddress={}", encoded)
 }
 
@@ -470,9 +491,6 @@ mod tests {
         }
     }
 
-    /*
-    // TODO: make these pass
-
     #[test]
     fn multiserver_addr_to_uri() {
         let uri = multiserver_address_to_uri(ADDRESS_URIS[0].1);
@@ -485,5 +503,4 @@ mod tests {
         assert!(sigil.is_ok());
         assert_eq!(sigil.unwrap(), ADDRESS_URIS[0].1);
     }
-    */
 }
