@@ -73,7 +73,7 @@ pub struct Parts {
 /// Check whether the `type` and `format` of the given `Parts` `struct` represent a canonical
 /// pairing.
 impl Parts {
-    fn validate(&self) -> Result<bool> {
+    pub fn validate(&self) -> Result<bool> {
         match self.type_.as_str() {
             "feed" => {
                 if !FEED_FORMATS.contains(&self.format.as_str()) {
