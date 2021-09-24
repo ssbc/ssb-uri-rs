@@ -2,6 +2,8 @@
 
 Utilities for recognising and converting Secure Scuttlebutt (SSB) URIs according to the [SSB URI Specification](https://github.com/ssb-ngi-pointer/ssb-uri-spec).
 
+[![ssb-uri-rs crate](https://img.shields.io/crates/v/ssb-uri-rs)](https://crates.io/crates/ssb-uri-rs)
+
 ## Example
 
 ```rust
