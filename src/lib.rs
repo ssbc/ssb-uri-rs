@@ -63,7 +63,7 @@ const FEED_FORMATS: [&str; 3] = ["ed25519", "bendybutt-v1", "gabbygrove-v1"];
 const MSG_FORMATS: [&str; 3] = ["sha256", "bendybutt-v1", "gabbygrove-v1"];
 
 /// Data representation for a TFD (`type`, `format`, `data`) identity.
-pub struct Parts(String, String, String);
+pub struct Parts(pub String, pub String, pub String);
 
 /// Check whether the `type` and `format` of the given `Parts` `struct` represent a canonical
 /// pairing.
