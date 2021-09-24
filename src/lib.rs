@@ -63,73 +63,61 @@ const FEED_FORMATS: [&str; 3] = ["ed25519", "bendybutt-v1", "gabbygrove-v1"];
 const MSG_FORMATS: [&str; 3] = ["sha256", "bendybutt-v1", "gabbygrove-v1"];
 
 /// Data representation for a TFD (`type`, `format`, `data`) identity.
-pub struct Parts {
-    // `type` is a reserved word in Rust (the underscore is a sketchy workaround)
-    pub type_: String,
-    pub format: String,
-    pub data: String,
-}
+pub struct Parts(String, String, String);
 
 /// Check whether the `type` and `format` of the given `Parts` `struct` represent a canonical
 /// pairing.
 impl Parts {
     pub fn validate(&self) -> Result<bool> {
-        match self.type_.as_str() {
+        // match on `type`
+        match self.0.as_str() {
             "feed" => {
-                if !FEED_FORMATS.contains(&self.format.as_str()) {
-                    Err(anyhow!("unknown format for type 'feed': {}", &self.format))
+                // check for `format`
+                if !FEED_FORMATS.contains(&self.1.as_str()) {
+                    Err(anyhow!("unknown format for type 'feed': {}", &self.1))
                 } else {
                     Ok(true)
                 }
             }
             "message" => {
-                if !MSG_FORMATS.contains(&self.format.as_str()) {
-                    Err(anyhow!(
-                        "unknown format for type 'message': {}",
-                        &self.format
-                    ))
+                if !MSG_FORMATS.contains(&self.1.as_str()) {
+                    Err(anyhow!("unknown format for type 'message': {}", &self.1))
                 } else {
                     Ok(true)
                 }
             }
             "blob" => {
-                if self.format.as_str() != "sha256" {
-                    Err(anyhow!("unknown format for type 'blob': {}", &self.format))
+                if self.1.as_str() != "sha256" {
+                    Err(anyhow!("unknown format for type 'blob': {}", &self.1))
                 } else {
                     Ok(true)
                 }
             }
             "address" => {
-                if self.format.as_str() != "multiserver" {
-                    Err(anyhow!(
-                        "unknown format for type 'address': {}",
-                        &self.format
-                    ))
+                if self.1.as_str() != "multiserver" {
+                    Err(anyhow!("unknown format for type 'address': {}", &self.1))
                 } else {
                     Ok(true)
                 }
             }
             "encryption-key" => {
-                if self.format.as_str() != "box2-dm-dh" {
+                if self.1.as_str() != "box2-dm-dh" {
                     Err(anyhow!(
                         "unknown format for type 'encryption-key': {}",
-                        &self.format
+                        &self.1
                     ))
                 } else {
                     Ok(true)
                 }
             }
             "identity" => {
-                if self.format.as_str() != "po-box" {
-                    Err(anyhow!(
-                        "unknown format for type 'identity': {}",
-                        &self.format
-                    ))
+                if self.1.as_str() != "po-box" {
+                    Err(anyhow!("unknown format for type 'identity': {}", &self.1))
                 } else {
                     Ok(true)
                 }
             }
-            _ => return Err(anyhow!("unknown type: {}", &self.type_)),
+            _ => return Err(anyhow!("unknown type: {}", &self.0)),
         }
     }
 }
@@ -221,9 +209,10 @@ pub fn is_multiserver_uri(uri: &str) -> Result<bool> {
         // this allows the use of the `?` operator to unwrap the query string
         .ok_or_else(|| anyhow!("uri does not include a query string: {}", uri))?;
 
-    if uri.starts_with("ssb:address:multiserver")
+    if (uri.starts_with("ssb:address:multiserver")
         || uri.starts_with("ssb:address/multiserver")
-        || uri.starts_with("ssb://address/multiserver") && query.starts_with("multiserverAddress")
+        || uri.starts_with("ssb://address/multiserver"))
+        && query.starts_with("multiserverAddress")
     {
         Ok(true)
     } else {
@@ -409,11 +398,9 @@ pub fn multiserver_address_to_uri(ms_addr: &str) -> String {
 /// Compose a new URI from the given parts: `type`, `format`, `data`.
 pub fn compose_uri(parts: Parts) -> Result<String> {
     parts.validate()?;
-    let base64_data = unsafe_to_safe_base64(&parts.data);
-    Ok(format!(
-        "ssb:{}/{}/{}",
-        parts.type_, parts.format, base64_data
-    ))
+    let Parts(type_, format, data) = parts;
+    let base64_data = unsafe_to_safe_base64(&data);
+    Ok(format!("ssb:{}/{}/{}", type_, format, base64_data))
 }
 
 /// Decompose the given URI into its constituent parts: `type`, `format`, `data`.
@@ -421,11 +408,11 @@ pub fn decompose_uri(uri: &str) -> Result<Parts> {
     let parsed_uri = Url::parse(uri)?;
     let pathname = parsed_uri.path();
     let parts_vec: Vec<&str> = pathname.split('/').collect();
-    let parts = Parts {
-        type_: parts_vec[0].to_string(),
-        format: parts_vec[1].to_string(),
-        data: safe_to_unsafe_base64(parts_vec[2]),
-    };
+    let parts = Parts(
+        parts_vec[0].to_string(),
+        parts_vec[1].to_string(),
+        safe_to_unsafe_base64(parts_vec[2]),
+    );
     parts.validate()?;
     Ok(parts)
 }
@@ -624,11 +611,12 @@ mod tests {
 
     #[test]
     fn compose_works() {
-        let parts = Parts {
-            type_: "message".to_string(),
-            format: "sha256".to_string(),
-            data: "g3hPVPDEO1Aj/uPl0+J2NlhFB2bbFLIHlty+YuqFZ3w=".to_string(),
-        };
+        // Parts(type, format, data)
+        let parts = Parts(
+            "message".to_string(),
+            "sha256".to_string(),
+            "g3hPVPDEO1Aj/uPl0+J2NlhFB2bbFLIHlty+YuqFZ3w=".to_string(),
+        );
         let uri = compose_uri(parts);
         assert!(uri.is_ok());
         assert_eq!(uri.unwrap(), MSG_URIS[1].1)
@@ -638,10 +626,10 @@ mod tests {
     fn decompose_works() {
         let parts_result = decompose_uri(MSG_URIS[1].1);
         assert!(parts_result.is_ok());
-        let parts = parts_result.unwrap();
-        assert_eq!(parts.type_, "message");
-        assert_eq!(parts.format, "sha256");
-        assert_eq!(parts.data, "g3hPVPDEO1Aj/uPl0+J2NlhFB2bbFLIHlty+YuqFZ3w=");
+        let Parts(type_, format, data) = parts_result.unwrap();
+        assert_eq!(type_, "message");
+        assert_eq!(format, "sha256");
+        assert_eq!(data, "g3hPVPDEO1Aj/uPl0+J2NlhFB2bbFLIHlty+YuqFZ3w=");
     }
 
     #[test]
