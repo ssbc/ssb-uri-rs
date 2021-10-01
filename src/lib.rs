@@ -203,20 +203,20 @@ pub fn is_blob_uri(uri: &str) -> Result<bool> {
 /// Check whether the given URI is a multiserver address URI.
 pub fn is_multiserver_uri(uri: &str) -> Result<bool> {
     let parsed_uri = Url::parse(uri)?;
-    let query = parsed_uri
-        .query()
-        // convert the `Option` returned from `query()` into a `Result`
-        // this allows the use of the `?` operator to unwrap the query string
-        .ok_or_else(|| anyhow!("uri does not include a query string: {}", uri))?;
-
-    if (uri.starts_with("ssb:address:multiserver")
-        || uri.starts_with("ssb:address/multiserver")
-        || uri.starts_with("ssb://address/multiserver"))
-        && query.starts_with("multiserverAddress")
-    {
-        Ok(true)
-    } else {
-        Ok(false)
+    match parsed_uri.query() {
+        Some(query) => {
+            if (uri.starts_with("ssb:address:multiserver")
+                || uri.starts_with("ssb:address/multiserver")
+                || uri.starts_with("ssb://address/multiserver"))
+                && query.starts_with("multiserverAddress")
+            {
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        }
+        // the uri is not a canonical multiserver uri if the query component is empty
+        None => Ok(false),
     }
 }
 
@@ -731,12 +731,8 @@ mod tests {
 
     #[test]
     fn invalid_multiserver_uri_not_recognised() {
-        match is_multiserver_uri("ssb:address/multiserver/") {
-            Err(e) => assert_eq!(
-                e.to_string(),
-                "uri does not include a query string: ssb:address/multiserver/"
-            ),
-            _ => panic!(),
-        }
+        let result = is_multiserver_uri("ssb:address/multiserver/");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), false);
     }
 }
