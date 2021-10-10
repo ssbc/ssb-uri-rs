@@ -4,7 +4,7 @@
 
 [package]
 name = "ssb-uri-rs"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Andrew Reid <glyph@mycelial.technology>"]
 description = "Utilities for recognising and converting Secure Scuttlebutt (SSB) URIs"
 edition = "2018"
