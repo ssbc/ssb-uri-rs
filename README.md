@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2021 Andrew 'glyph' Reid
+
+SPDX-License-Identifier: CC0-1.0
+-->
+
 # ssb-uri-rs
 
 Utilities for recognising and converting Secure Scuttlebutt (SSB) URIs according to the [SSB URI Specification](https://github.com/ssb-ngi-pointer/ssb-uri-spec).

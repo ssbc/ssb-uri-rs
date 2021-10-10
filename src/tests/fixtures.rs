@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2021 Andrew 'glyph' Reid
+//
+// SPDX-License-Identifier: LGPL-3.0-only
+
 // Test data
 //
 // Source: https://github.com/staltz/ssb-uri2/blob/8e8d3cf76fd3b68fe46e0338890df74457c3a036/test/fixtures.js
