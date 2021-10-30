@@ -46,10 +46,13 @@
 //! ## License
 //!
 //! LGPL-3.0.
-use anyhow::{anyhow, Result};
+mod error;
+
 use percent_encoding::{percent_decode, utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use regex::Regex;
 use url::Url;
+
+use crate::error::SsbUriError;
 
 /// An ASCII character set which matches that used by `encodeURIComponent()` in JavaScript. Includes all characters except: `A-Z a-z 0-9 - _ . ! ~ * ' ( )`.
 const ENCODE_URI_COMPONENT_SET: &AsciiSet = &NON_ALPHANUMERIC
@@ -72,56 +75,76 @@ pub struct Parts(pub String, pub String, pub String);
 /// Check whether the `type` and `format` of the given `Parts` `struct` represent a canonical
 /// pairing.
 impl Parts {
-    pub fn validate(&self) -> Result<bool> {
+    pub fn validate(&self) -> Result<bool, SsbUriError> {
         // match on `type`
         match self.0.as_str() {
             "feed" => {
                 // check for `format`
                 if !FEED_FORMATS.contains(&self.1.as_str()) {
-                    Err(anyhow!("unknown format for type 'feed': {}", &self.1))
+                    Err(SsbUriError::UnknownFormat(format!(
+                        "unknown format for type 'feed': {}",
+                        &self.1
+                    )))
                 } else {
                     Ok(true)
                 }
             }
             "message" => {
                 if !MSG_FORMATS.contains(&self.1.as_str()) {
-                    Err(anyhow!("unknown format for type 'message': {}", &self.1))
+                    Err(SsbUriError::UnknownFormat(format!(
+                        "unknown format for type 'message': {}",
+                        &self.1
+                    )))
                 } else {
                     Ok(true)
                 }
             }
             "blob" => {
                 if self.1.as_str() != "sha256" {
-                    Err(anyhow!("unknown format for type 'blob': {}", &self.1))
+                    Err(SsbUriError::UnknownFormat(format!(
+                        "unknown format for type 'blob': {}",
+                        &self.1
+                    )))
                 } else {
                     Ok(true)
                 }
             }
             "address" => {
                 if self.1.as_str() != "multiserver" {
-                    Err(anyhow!("unknown format for type 'address': {}", &self.1))
+                    Err(SsbUriError::UnknownFormat(format!(
+                        "unknown format for type 'address': {}",
+                        &self.1
+                    )))
                 } else {
                     Ok(true)
                 }
             }
             "encryption-key" => {
                 if self.1.as_str() != "box2-dm-dh" {
-                    Err(anyhow!(
+                    Err(SsbUriError::UnknownFormat(format!(
                         "unknown format for type 'encryption-key': {}",
                         &self.1
-                    ))
+                    )))
                 } else {
                     Ok(true)
                 }
             }
             "identity" => {
                 if self.1.as_str() != "po-box" {
-                    Err(anyhow!("unknown format for type 'identity': {}", &self.1))
+                    Err(SsbUriError::UnknownFormat(format!(
+                        "unknown format for type 'identity': {}",
+                        &self.1
+                    )))
                 } else {
                     Ok(true)
                 }
             }
-            _ => return Err(anyhow!("unknown type: {}", &self.0)),
+            _ => {
+                return Err(SsbUriError::UnknownType(format!(
+                    "unknown type: {}",
+                    &self.0
+                )))
+            }
         }
     }
 }
@@ -139,7 +162,7 @@ pub fn unsafe_to_safe_base64(input: &str) -> String {
 }
 
 /// Extract and return the base64 data from a URI pathname.
-pub fn extract_base64_data(pathname: &str) -> Result<Option<String>> {
+pub fn extract_base64_data(pathname: &str) -> Result<Option<String>, SsbUriError> {
     let re = Regex::new(r#"(:|/)([\w_\-=]+)$"#)?;
     // `caps` will be `None` if no capture is found (hence `Option` in return type)
     let caps = re.captures(pathname);
@@ -154,7 +177,7 @@ pub fn extract_base64_data(pathname: &str) -> Result<Option<String>> {
 /* SSB URI TYPE AND FORMAT CHECKING FUNCTIONS */
 
 /// Ensure a URI is formatted according to the specification for the given `type` and `format`.
-pub fn check_type_format(uri: &str, type_: &str, format: &str) -> Result<bool> {
+pub fn check_type_format(uri: &str, type_: &str, format: &str) -> Result<bool, SsbUriError> {
     let parsed_uri = Url::parse(uri)?;
     let base64_data = extract_base64_data(parsed_uri.path())?;
 
@@ -170,42 +193,42 @@ pub fn check_type_format(uri: &str, type_: &str, format: &str) -> Result<bool> {
 }
 
 /// Check whether the given URI is a classic feed URI.
-pub fn is_classic_feed_uri(uri: &str) -> Result<bool> {
+pub fn is_classic_feed_uri(uri: &str) -> Result<bool, SsbUriError> {
     check_type_format(uri, "feed", "ed25519")
 }
 
 /// Check whether the given URI is a Bendy Butt feed URI.
-pub fn is_bendy_butt_v1_feed_uri(uri: &str) -> Result<bool> {
+pub fn is_bendy_butt_v1_feed_uri(uri: &str) -> Result<bool, SsbUriError> {
     check_type_format(uri, "feed", "bendybutt-v1")
 }
 
 /// Check whether the given URI is a Gabby Grove feed URI.
-pub fn is_gabby_grove_v1_feed_uri(uri: &str) -> Result<bool> {
+pub fn is_gabby_grove_v1_feed_uri(uri: &str) -> Result<bool, SsbUriError> {
     check_type_format(uri, "feed", "gabbygrove-v1")
 }
 
 /// Check whether the given URI is a classic message URI.
-pub fn is_classic_msg_uri(uri: &str) -> Result<bool> {
+pub fn is_classic_msg_uri(uri: &str) -> Result<bool, SsbUriError> {
     check_type_format(uri, "message", "sha256")
 }
 
 /// Check whether the given URI is a Bendy Butt message URI.
-pub fn is_bendy_butt_v1_msg_uri(uri: &str) -> Result<bool> {
+pub fn is_bendy_butt_v1_msg_uri(uri: &str) -> Result<bool, SsbUriError> {
     check_type_format(uri, "message", "bendybutt-v1")
 }
 
 /// Check whether the given URI is a Gabby Grove message URI.
-pub fn is_gabby_grove_v1_msg_uri(uri: &str) -> Result<bool> {
+pub fn is_gabby_grove_v1_msg_uri(uri: &str) -> Result<bool, SsbUriError> {
     check_type_format(uri, "message", "gabbygrove-v1")
 }
 
 /// Check whether the given URI is a blob URI.
-pub fn is_blob_uri(uri: &str) -> Result<bool> {
+pub fn is_blob_uri(uri: &str) -> Result<bool, SsbUriError> {
     check_type_format(uri, "blob", "sha256")
 }
 
 /// Check whether the given URI is a multiserver address URI.
-pub fn is_multiserver_uri(uri: &str) -> Result<bool> {
+pub fn is_multiserver_uri(uri: &str) -> Result<bool, SsbUriError> {
     let parsed_uri = Url::parse(uri)?;
     match parsed_uri.query() {
         Some(query) => {
@@ -225,17 +248,17 @@ pub fn is_multiserver_uri(uri: &str) -> Result<bool> {
 }
 
 /// Check whether the given URI is an encryption key (box2 Diffie-Hellman) URI.
-pub fn is_encryption_key_box2_uri(uri: &str) -> Result<bool> {
+pub fn is_encryption_key_box2_uri(uri: &str) -> Result<bool, SsbUriError> {
     check_type_format(uri, "encryption-key", "box-dm-dh")
 }
 
 /// Check whether the given URI is an identity PO-box URI.
-pub fn is_identity_po_box_uri(uri: &str) -> Result<bool> {
+pub fn is_identity_po_box_uri(uri: &str) -> Result<bool, SsbUriError> {
     check_type_format(uri, "identity", "po-box")
 }
 
 /// Check whether the given URI is an experimental URI.
-pub fn is_experimental_uri(uri: &str) -> Result<bool> {
+pub fn is_experimental_uri(uri: &str) -> Result<bool, SsbUriError> {
     if uri.starts_with("ssb:experimental") || uri.starts_with("ssb://experimental") {
         Ok(true)
     } else {
@@ -244,7 +267,7 @@ pub fn is_experimental_uri(uri: &str) -> Result<bool> {
 }
 
 /// Check whether the given URI matches any of the SSB URI specifications.
-pub fn is_ssb_uri(uri: &str) -> Result<bool> {
+pub fn is_ssb_uri(uri: &str) -> Result<bool, SsbUriError> {
     if is_classic_feed_uri(uri)?
         || is_bendy_butt_v1_feed_uri(uri)?
         || is_gabby_grove_v1_feed_uri(uri)?
@@ -265,7 +288,7 @@ pub fn is_ssb_uri(uri: &str) -> Result<bool> {
 
 /// Check whether the given URI is an experimental URI with an `action` query parameter matching
 /// the given action.
-pub fn is_experimental_uri_with_action(uri: &str, action: &str) -> Result<bool> {
+pub fn is_experimental_uri_with_action(uri: &str, action: &str) -> Result<bool, SsbUriError> {
     let parsed_uri = Url::parse(uri)?;
     let mut query_pairs = parsed_uri.query_pairs().into_owned();
 
@@ -281,110 +304,128 @@ pub fn is_experimental_uri_with_action(uri: &str, action: &str) -> Result<bool> 
 /* SSB URI CONVERSION FUNCTIONS */
 
 /// Convert a classic feed URI to a sigil-based (`@`) `ed25519` identifier.
-pub fn feed_uri_to_sigil(uri: &str) -> Result<String> {
+pub fn feed_uri_to_sigil(uri: &str) -> Result<String, SsbUriError> {
     match is_classic_feed_uri(uri)? {
         true => {
             let parsed_uri = Url::parse(uri)?;
             let base64_data = extract_base64_data(parsed_uri.path())?;
             match base64_data {
                 Some(data) => Ok(format!("@{}.ed25519", data)),
-                None => Err(anyhow!("failed to extract base64 data from uri: {}", uri)),
+                None => Err(SsbUriError::InvalidUri(format!(
+                    "failed to extract base64 data from uri: {}",
+                    uri
+                ))),
             }
         }
-        false => Err(anyhow!(
+        false => Err(SsbUriError::InvalidUri(format!(
             "uri is not type `feed` and format `ed25519`: {}",
             uri
-        )),
+        ))),
     }
 }
 
 /// Convert a classic message URI to a sigil-based (`%`) `sha256` identifier.
-pub fn msg_uri_to_sigil(uri: &str) -> Result<String> {
+pub fn msg_uri_to_sigil(uri: &str) -> Result<String, SsbUriError> {
     match is_classic_msg_uri(uri)? {
         true => {
             let parsed_uri = Url::parse(uri)?;
             let base64_data = extract_base64_data(parsed_uri.path())?;
             match base64_data {
                 Some(data) => Ok(format!("%{}.sha256", data)),
-                None => Err(anyhow!("failed to extract base64 data from uri: {}", uri)),
+                None => Err(SsbUriError::InvalidUri(format!(
+                    "failed to extract base64 data from uri: {}",
+                    uri
+                ))),
             }
         }
-        false => Err(anyhow!(
+        false => Err(SsbUriError::InvalidUri(format!(
             "uri is not type `message` and format `sha256`: {}",
             uri
-        )),
+        ))),
     }
 }
 
 /// Convert a blob URI to a sigil-based (`&`) `sha256` identifier.
-pub fn blob_uri_to_sigil(uri: &str) -> Result<String> {
+pub fn blob_uri_to_sigil(uri: &str) -> Result<String, SsbUriError> {
     match is_blob_uri(uri)? {
         true => {
             let parsed_uri = Url::parse(uri)?;
             let base64_data = extract_base64_data(parsed_uri.path())?;
             match base64_data {
                 Some(data) => Ok(format!("&{}.sha256", data)),
-                None => Err(anyhow!("failed to extract base64 data from uri: {}", uri)),
+                None => Err(SsbUriError::InvalidUri(format!(
+                    "failed to extract base64 data from uri: {}",
+                    uri
+                ))),
             }
         }
-        false => Err(anyhow!(
+        false => Err(SsbUriError::InvalidUri(format!(
             "uri is not of type `blob` and format `sha256`: {}",
             uri
-        )),
+        ))),
     }
 }
 
 /// Convert a multiserver address URI to a multiserver address.
-pub fn multiserver_uri_to_address(uri: &str) -> Result<String> {
+pub fn multiserver_uri_to_address(uri: &str) -> Result<String, SsbUriError> {
     let parsed_uri = Url::parse(uri)?;
-    let query = parsed_uri
-        .query()
-        .ok_or_else(|| anyhow!("uri does not include a query string: {}", uri))?;
+    let query = parsed_uri.query().ok_or_else(|| {
+        SsbUriError::InvalidUri(format!("uri does not include a query string: {}", uri))
+    })?;
 
     match query.starts_with("multiserverAddress=") {
         true => {
             let ms_addr = query.strip_prefix("multiserverAddress=").ok_or_else(|| {
-                anyhow!(
+                SsbUriError::InvalidUri(format!(
                     "failed to strip prefix from multiserver address uri query: {}",
                     uri
-                )
+                ))
             })?;
             let ms_addr_decoded = percent_decode(ms_addr.as_bytes()).decode_utf8()?;
             Ok(ms_addr_decoded.to_string())
         }
-        false => Err(anyhow!(
+        false => Err(SsbUriError::InvalidUri(format!(
             "uri query string does not start with `multiserverAddress`: {}",
             uri
-        )),
+        ))),
     }
 }
 
 /* SIGIL CONVERSION FUNCTIONS */
 
 /// Convert a sigil-based (`@`) `ed25519` feed identifier to a URI.
-pub fn feed_sigil_to_uri(sigil: &str) -> Result<String> {
-    let data = &sigil
-        .strip_suffix(".ed25519")
-        .ok_or_else(|| anyhow!("feed sigil reference has an invalid suffix: {}", sigil))?;
+pub fn feed_sigil_to_uri(sigil: &str) -> Result<String, SsbUriError> {
+    let data = &sigil.strip_suffix(".ed25519").ok_or_else(|| {
+        SsbUriError::InvalidSuffix(format!(
+            "feed sigil reference has an invalid suffix: {}",
+            sigil
+        ))
+    })?;
     // ignore the prefix ('sigil') and perform base64 conversion
     let base64_data = unsafe_to_safe_base64(&data[1..]);
     Ok(format!("ssb:feed/ed25519/{}", base64_data))
 }
 
 /// Convert a sigil-based (`%`) `sha256` message identifier to a URI.
-pub fn msg_sigil_to_uri(sigil: &str) -> Result<String> {
-    let data = &sigil
-        .strip_suffix(".sha256")
-        .ok_or_else(|| anyhow!("message sigil reference has an invalid suffix: {}", sigil))?;
+pub fn msg_sigil_to_uri(sigil: &str) -> Result<String, SsbUriError> {
+    let data = &sigil.strip_suffix(".sha256").ok_or_else(|| {
+        SsbUriError::InvalidSuffix(format!(
+            "message sigil reference has an invalid suffix: {}",
+            sigil
+        ))
+    })?;
     let base64_data = unsafe_to_safe_base64(&data[1..]);
     Ok(format!("ssb:message/sha256/{}", base64_data))
 }
 
 /// Convert a sigil-based (`&`) `sha256` blob identifier to a URI.
-pub fn blob_sigil_to_uri(sigil: &str) -> Result<String> {
-    let data = &sigil
-        .strip_suffix(".sha256")
-        .ok_or_else(|| anyhow!("blob sigil reference has an invalid suffix: {}", sigil))?;
+pub fn blob_sigil_to_uri(sigil: &str) -> Result<String, SsbUriError> {
+    let data = &sigil.strip_suffix(".sha256").ok_or_else(|| {
+        SsbUriError::InvalidSuffix(format!(
+            "blob sigil reference has an invalid suffix: {}",
+            sigil
+        ))
+    })?;
     let base64_data = unsafe_to_safe_base64(&data[1..]);
     Ok(format!("ssb:blob/sha256/{}", base64_data))
 }
@@ -400,7 +441,7 @@ pub fn multiserver_address_to_uri(ms_addr: &str) -> String {
 /* COMPOSITION AND DECOMPOSITION FUNCTIONS */
 
 /// Compose a new URI from the given parts: `type`, `format`, `data`.
-pub fn compose_uri(parts: Parts) -> Result<String> {
+pub fn compose_uri(parts: Parts) -> Result<String, SsbUriError> {
     parts.validate()?;
     let Parts(type_, format, data) = parts;
     let base64_data = unsafe_to_safe_base64(&data);
@@ -408,7 +449,7 @@ pub fn compose_uri(parts: Parts) -> Result<String> {
 }
 
 /// Decompose the given URI into its constituent parts: `type`, `format`, `data`.
-pub fn decompose_uri(uri: &str) -> Result<Parts> {
+pub fn decompose_uri(uri: &str) -> Result<Parts, SsbUriError> {
     let parsed_uri = Url::parse(uri)?;
     let pathname = parsed_uri.path();
     let parts_vec: Vec<&str> = pathname.split('/').collect();
