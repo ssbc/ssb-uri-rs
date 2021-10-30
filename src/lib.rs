@@ -11,10 +11,10 @@
 //! ## Example
 //!
 //!```
-//! use anyhow::Result;
 //! use ssb_uri_rs;
+//! use ssb_uri_rs::error::SsbUriError;
 //!
-//! fn example() -> Result<()> {
+//! fn example() -> Result<(), SsbUriError> {
 //!     let example_uri = "ssb:message/sha256/g3hPVPDEO1Aj_uPl0-J2NlhFB2bbFLIHlty-YuqFZ3w=";
 //!
 //!     assert!(ssb_uri_rs::is_classic_msg_uri(example_uri)?);
@@ -46,7 +46,7 @@
 //! ## License
 //!
 //! LGPL-3.0.
-mod error;
+pub mod error;
 
 use percent_encoding::{percent_decode, utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use regex::Regex;
