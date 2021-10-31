@@ -1,3 +1,8 @@
+use core::str::Utf8Error;
+use regex::Error as RegexError;
+use std::{error, fmt};
+use url::ParseError;
+
 #[derive(Debug)]
 pub enum SsbUriError {
     UnknownFormat(String),
@@ -9,8 +14,10 @@ pub enum SsbUriError {
     InvalidRegex(regex::Error),
 }
 
-impl std::fmt::Display for SsbUriError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl error::Error for SsbUriError {}
+
+impl fmt::Display for SsbUriError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             SsbUriError::InvalidSuffix(ref err) => {
                 write!(f, "{}", err)
@@ -37,20 +44,20 @@ impl std::fmt::Display for SsbUriError {
     }
 }
 
-impl From<url::ParseError> for SsbUriError {
-    fn from(err: url::ParseError) -> SsbUriError {
+impl From<ParseError> for SsbUriError {
+    fn from(err: ParseError) -> SsbUriError {
         SsbUriError::ParseUrl(err)
     }
 }
 
-impl From<core::str::Utf8Error> for SsbUriError {
-    fn from(err: core::str::Utf8Error) -> SsbUriError {
+impl From<Utf8Error> for SsbUriError {
+    fn from(err: Utf8Error) -> SsbUriError {
         SsbUriError::InvalidUtf8(err)
     }
 }
 
-impl From<regex::Error> for SsbUriError {
-    fn from(err: regex::Error) -> SsbUriError {
+impl From<RegexError> for SsbUriError {
+    fn from(err: RegexError) -> SsbUriError {
         SsbUriError::InvalidRegex(err)
     }
 }
