@@ -3,6 +3,9 @@ use regex::Error as RegexError;
 use std::{error, fmt};
 use url::ParseError;
 
+/// A custom error type encapsulating all possible errors for this library.
+/// `From` implementations are provided for external error types, allowing
+/// the `?` operator to be used on functions which return `Result<_, SsbUriError>`.
 #[derive(Debug)]
 pub enum SsbUriError {
     UnknownFormat(String),
