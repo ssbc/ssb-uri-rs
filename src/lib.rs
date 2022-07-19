@@ -66,8 +66,8 @@ const ENCODE_URI_COMPONENT_SET: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'(')
     .remove(b')');
 
-const FEED_FORMATS: [&str; 3] = ["ed25519", "bendybutt-v1", "gabbygrove-v1"];
-const MSG_FORMATS: [&str; 3] = ["sha256", "bendybutt-v1", "gabbygrove-v1"];
+const FEED_FORMATS: [&str; 4] = ["ed25519", "bendybutt-v1", "gabbygrove-v1", "buttwoo-v1"];
+const MSG_FORMATS: [&str; 4] = ["sha256", "bendybutt-v1", "gabbygrove-v1", "buttwoo-v1"];
 
 /// Data representation for a TFD (`type`, `format`, `data`) identity.
 pub struct Parts(pub String, pub String, pub String);
@@ -207,6 +207,11 @@ pub fn is_gabby_grove_v1_feed_uri(uri: &str) -> Result<bool, SsbUriError> {
     check_type_format(uri, "feed", "gabbygrove-v1")
 }
 
+/// Check whether the given URI is a Buttwoo feed URI.
+pub fn is_buttwoo_v1_feed_uri(uri: &str) -> Result<bool, SsbUriError> {
+    check_type_format(uri, "feed", "buttwoo-v1")
+}
+
 /// Check whether the given URI is a classic message URI.
 pub fn is_classic_msg_uri(uri: &str) -> Result<bool, SsbUriError> {
     check_type_format(uri, "message", "sha256")
@@ -220,6 +225,11 @@ pub fn is_bendy_butt_v1_msg_uri(uri: &str) -> Result<bool, SsbUriError> {
 /// Check whether the given URI is a Gabby Grove message URI.
 pub fn is_gabby_grove_v1_msg_uri(uri: &str) -> Result<bool, SsbUriError> {
     check_type_format(uri, "message", "gabbygrove-v1")
+}
+
+/// Check whether the given URI is a Buttwoo message URI.
+pub fn is_buttwoo_v1_msg_uri(uri: &str) -> Result<bool, SsbUriError> {
+    check_type_format(uri, "message", "buttwoo-v1")
 }
 
 /// Check whether the given URI is a blob URI.
@@ -271,9 +281,11 @@ pub fn is_ssb_uri(uri: &str) -> Result<bool, SsbUriError> {
     if is_classic_feed_uri(uri)?
         || is_bendy_butt_v1_feed_uri(uri)?
         || is_gabby_grove_v1_feed_uri(uri)?
+        || is_buttwoo_v1_feed_uri(uri)?
         || is_classic_msg_uri(uri)?
         || is_bendy_butt_v1_msg_uri(uri)?
         || is_gabby_grove_v1_msg_uri(uri)?
+        || is_buttwoo_v1_msg_uri(uri)?
         || is_blob_uri(uri)?
         || is_multiserver_uri(uri)?
         || is_encryption_key_box2_uri(uri)?
@@ -530,6 +542,10 @@ mod tests {
         let gg_result = is_gabby_grove_v1_msg_uri(MSG_URIS[5].1);
         assert!(gg_result.is_ok());
         assert_eq!(gg_result.unwrap(), true);
+
+        let b2_result = is_buttwoo_v1_msg_uri(MSG_URIS[6].1);
+        assert!(b2_result.is_ok());
+        assert_eq!(b2_result.unwrap(), true);
     }
 
     #[test]
@@ -565,6 +581,10 @@ mod tests {
         let gg_result = is_gabby_grove_v1_feed_uri(FEED_URIS[5].1);
         assert!(gg_result.is_ok());
         assert_eq!(gg_result.unwrap(), true);
+
+        let b2_result = is_buttwoo_v1_feed_uri(FEED_URIS[6].1);
+        assert!(b2_result.is_ok());
+        assert_eq!(b2_result.unwrap(), true);
     }
 
     #[test]
@@ -713,6 +733,14 @@ mod tests {
     }
 
     #[test]
+    fn cannot_convert_b2_msg_to_sigil() {
+        match msg_uri_to_sigil(MSG_URIS[6].1) {
+            Err(e) => assert_eq!(e.to_string(), "uri is not type `message` and format `sha256`: ssb://message/buttwoo-v1/Z0rMVMDEO1Aj0uPl0_J2NlhFB2bbFLIHlty_YuqArFq="),
+                _ => panic!()
+        }
+    }
+
+    #[test]
     fn invalid_feed_uri_not_recognised() {
         let result = is_classic_feed_uri("ssb:feed/ed25519/");
         assert!(result.is_ok());
@@ -747,6 +775,17 @@ mod tests {
             Err(e) => assert_eq!(
                 e.to_string(),
                 "uri is not type `feed` and format `ed25519`: ssb:feed/gabbygrove-v1/FY5OG311W4j_KPh8H9B2MZt4WSziy_p-ABkKERJdujQ=",
+            ),
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn cannot_convert_b2_feed_uri_to_sigil() {
+        match feed_uri_to_sigil(FEED_URIS[6].1) {
+            Err(e) => assert_eq!(
+                e.to_string(),
+                "uri is not type `feed` and format `ed25519`: ssb:feed/buttwoo-v1/FY5OG311W4j_KPh8H9B2MZt4WSziy_p-ABkKERJdujQ=",
             ),
             _ => panic!(),
         }
