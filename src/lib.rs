@@ -153,12 +153,12 @@ impl Parts {
 
 /// Replace all instances of the URL-safe character set with the standard equivalent.
 pub fn safe_to_unsafe_base64(input: &str) -> String {
-    input.replace("-", "+").replace("_", "/")
+    input.replace('-', "+").replace('_', "/")
 }
 
 /// Replace all instance of the standard character set with the URL-safe equivalent.
 pub fn unsafe_to_safe_base64(input: &str) -> String {
-    input.replace("+", "-").replace("/", "_")
+    input.replace('+', "-").replace('/', "_")
 }
 
 /// Extract and return the base64 data from a URI pathname.
