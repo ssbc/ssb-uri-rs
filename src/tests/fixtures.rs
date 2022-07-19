@@ -6,7 +6,7 @@
 //
 // Source: https://github.com/staltz/ssb-uri2/blob/8e8d3cf76fd3b68fe46e0338890df74457c3a036/test/fixtures.js
 
-pub const MSG_URIS: [(&str, &str); 6] = [
+pub const MSG_URIS: [(&str, &str); 7] = [
     (
         "sigil",
         "%g3hPVPDEO1Aj/uPl0+J2NlhFB2bbFLIHlty+YuqFZ3w=.sha256",
@@ -31,9 +31,13 @@ pub const MSG_URIS: [(&str, &str); 6] = [
         "uri5",
         "ssb:message/gabbygrove-v1/QibgMEFVrupoOpiILKVoNXnhzdVQVZf7dkmL9MSXO5g=",
     ),
+    (
+        "uri6",
+        "ssb://message/buttwoo-v1/Z0rMVMDEO1Aj0uPl0_J2NlhFB2bbFLIHlty_YuqArFq=",
+    ),
 ];
 
-pub const FEED_URIS: [(&str, &str); 6] = [
+pub const FEED_URIS: [(&str, &str); 7] = [
     (
         "sigil",
         "@+oaWWDs8g73EZFUMfW37R/ULtFEjwKN/DczvdYihjbU=.ed25519",
@@ -57,6 +61,10 @@ pub const FEED_URIS: [(&str, &str); 6] = [
     (
         "uri5",
         "ssb:feed/gabbygrove-v1/FY5OG311W4j_KPh8H9B2MZt4WSziy_p-ABkKERJdujQ=",
+    ),
+    (
+        "uri6",
+        "ssb:feed/buttwoo-v1/FY5OG311W4j_KPh8H9B2MZt4WSziy_p-ABkKERJdujQ=",
     ),
 ];
 
