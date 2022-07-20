@@ -69,8 +69,8 @@ const ENCODE_URI_COMPONENT_SET: &AsciiSet = &NON_ALPHANUMERIC
 const FEED_FORMATS: [&str; 4] = ["ed25519", "bendybutt-v1", "gabbygrove-v1", "buttwoo-v1"];
 const MSG_FORMATS: [&str; 4] = ["sha256", "bendybutt-v1", "gabbygrove-v1", "buttwoo-v1"];
 
-/// Data representation for a TFD (`type`, `format`, `data`) identity.
-pub struct Parts(pub String, pub String, pub String);
+/// Data representation for a TFDE (`type`, `format`, `data`, `extra_data`) identity.
+pub struct Parts(pub String, pub String, pub String, pub Option<String>);
 
 /// Check whether the `type` and `format` of the given `Parts` `struct` represent a canonical
 /// pairing.
@@ -452,24 +452,36 @@ pub fn multiserver_address_to_uri(ms_addr: &str) -> String {
 
 /* COMPOSITION AND DECOMPOSITION FUNCTIONS */
 
-/// Compose a new URI from the given parts: `type`, `format`, `data`.
+/// Compose a new URI from the given parts: `type`, `format`, `data`, `extra_data`.
 pub fn compose_uri(parts: Parts) -> Result<String, SsbUriError> {
     parts.validate()?;
-    let Parts(type_, format, data) = parts;
+    let Parts(type_, format, data, extra_data) = parts;
     let base64_data = unsafe_to_safe_base64(&data);
+    if let Some(val) = extra_data {
+        let base64_extra_data = unsafe_to_safe_base64(&val);
+        return Ok(format!(
+            "ssb:{}/{}/{}/{}",
+            type_, format, base64_data, base64_extra_data
+        ));
+    }
     Ok(format!("ssb:{}/{}/{}", type_, format, base64_data))
 }
 
-/// Decompose the given URI into its constituent parts: `type`, `format`, `data`.
+/// Decompose the given URI into its constituent parts: `type`, `format`, `data`, `extra_data`.
 pub fn decompose_uri(uri: &str) -> Result<Parts, SsbUriError> {
     let parsed_uri = Url::parse(uri)?;
     let pathname = parsed_uri.path();
     let parts_vec: Vec<&str> = pathname.split('/').collect();
-    let parts = Parts(
+    let mut parts = Parts(
         parts_vec[0].to_string(),
         parts_vec[1].to_string(),
         safe_to_unsafe_base64(parts_vec[2]),
+        None,
     );
+    // handle the "extra_data" case
+    if parts_vec.len() == 4 {
+        parts.3 = Some(safe_to_unsafe_base64(parts_vec[3]))
+    };
     parts.validate()?;
     Ok(parts)
 }
@@ -676,11 +688,12 @@ mod tests {
 
     #[test]
     fn compose_works() {
-        // Parts(type, format, data)
+        // Parts(type, format, data, extra_data)
         let parts = Parts(
             "message".to_string(),
             "sha256".to_string(),
             "g3hPVPDEO1Aj/uPl0+J2NlhFB2bbFLIHlty+YuqFZ3w=".to_string(),
+            None,
         );
         let uri = compose_uri(parts);
         assert!(uri.is_ok());
@@ -691,10 +704,38 @@ mod tests {
     fn decompose_works() {
         let parts_result = decompose_uri(MSG_URIS[1].1);
         assert!(parts_result.is_ok());
-        let Parts(type_, format, data) = parts_result.unwrap();
+        let Parts(type_, format, data, _extra_data) = parts_result.unwrap();
         assert_eq!(type_, "message");
         assert_eq!(format, "sha256");
         assert_eq!(data, "g3hPVPDEO1Aj/uPl0+J2NlhFB2bbFLIHlty+YuqFZ3w=");
+    }
+
+    #[test]
+    fn compose_works_with_extra_data() {
+        // Parts(type, format, data, extra_data)
+        let parts = Parts(
+            "feed".to_string(),
+            "buttwoo-v1".to_string(),
+            "FY5OG311W4j/KPh8H9B2MZt4WSziy/p+ABkKERJdujQ=".to_string(),
+            Some("Z0rMVMDEO1Aj0uPl0/J2NlhFB2bbFLIHlty/YuqArFq=".to_string()),
+        );
+        let uri = compose_uri(parts);
+        assert!(uri.is_ok());
+        assert_eq!(uri.unwrap(), FEED_URIS[7].1)
+    }
+
+    #[test]
+    fn decompose_works_with_extra_data() {
+        let parts_result = decompose_uri(FEED_URIS[7].1);
+        assert!(parts_result.is_ok());
+        let Parts(type_, format, data, extra_data) = parts_result.unwrap();
+        assert_eq!(type_, "feed");
+        assert_eq!(format, "buttwoo-v1");
+        assert_eq!(data, "FY5OG311W4j/KPh8H9B2MZt4WSziy/p+ABkKERJdujQ=");
+        assert_eq!(
+            extra_data.as_deref(),
+            Some("Z0rMVMDEO1Aj0uPl0/J2NlhFB2bbFLIHlty/YuqArFq=").as_deref()
+        );
     }
 
     #[test]
