@@ -37,7 +37,7 @@ pub const MSG_URIS: [(&str, &str); 7] = [
     ),
 ];
 
-pub const FEED_URIS: [(&str, &str); 7] = [
+pub const FEED_URIS: [(&str, &str); 8] = [
     (
         "sigil",
         "@+oaWWDs8g73EZFUMfW37R/ULtFEjwKN/DczvdYihjbU=.ed25519",
@@ -65,6 +65,10 @@ pub const FEED_URIS: [(&str, &str); 7] = [
     (
         "uri6",
         "ssb:feed/buttwoo-v1/FY5OG311W4j_KPh8H9B2MZt4WSziy_p-ABkKERJdujQ=",
+    ),
+    (
+        "uri7",
+        "ssb:feed/buttwoo-v1/FY5OG311W4j_KPh8H9B2MZt4WSziy_p-ABkKERJdujQ=/Z0rMVMDEO1Aj0uPl0_J2NlhFB2bbFLIHlty_YuqArFq=",
     ),
 ];
 
