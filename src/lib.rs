@@ -66,11 +66,11 @@ const ENCODE_URI_COMPONENT_SET: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'(')
     .remove(b')');
 
-const FEED_FORMATS: [&str; 3] = ["ed25519", "bendybutt-v1", "gabbygrove-v1"];
-const MSG_FORMATS: [&str; 3] = ["sha256", "bendybutt-v1", "gabbygrove-v1"];
+const FEED_FORMATS: [&str; 4] = ["ed25519", "bendybutt-v1", "gabbygrove-v1", "buttwoo-v1"];
+const MSG_FORMATS: [&str; 4] = ["sha256", "bendybutt-v1", "gabbygrove-v1", "buttwoo-v1"];
 
-/// Data representation for a TFD (`type`, `format`, `data`) identity.
-pub struct Parts(pub String, pub String, pub String);
+/// Data representation for a TFDE (`type`, `format`, `data`, `extra_data`) identity.
+pub struct Parts(pub String, pub String, pub String, pub Option<String>);
 
 /// Check whether the `type` and `format` of the given `Parts` `struct` represent a canonical
 /// pairing.
@@ -153,12 +153,12 @@ impl Parts {
 
 /// Replace all instances of the URL-safe character set with the standard equivalent.
 pub fn safe_to_unsafe_base64(input: &str) -> String {
-    input.replace("-", "+").replace("_", "/")
+    input.replace('-', "+").replace('_', "/")
 }
 
 /// Replace all instance of the standard character set with the URL-safe equivalent.
 pub fn unsafe_to_safe_base64(input: &str) -> String {
-    input.replace("+", "-").replace("/", "_")
+    input.replace('+', "-").replace('/', "_")
 }
 
 /// Extract and return the base64 data from a URI pathname.
@@ -207,6 +207,11 @@ pub fn is_gabby_grove_v1_feed_uri(uri: &str) -> Result<bool, SsbUriError> {
     check_type_format(uri, "feed", "gabbygrove-v1")
 }
 
+/// Check whether the given URI is a Buttwoo feed URI.
+pub fn is_buttwoo_v1_feed_uri(uri: &str) -> Result<bool, SsbUriError> {
+    check_type_format(uri, "feed", "buttwoo-v1")
+}
+
 /// Check whether the given URI is a classic message URI.
 pub fn is_classic_msg_uri(uri: &str) -> Result<bool, SsbUriError> {
     check_type_format(uri, "message", "sha256")
@@ -220,6 +225,11 @@ pub fn is_bendy_butt_v1_msg_uri(uri: &str) -> Result<bool, SsbUriError> {
 /// Check whether the given URI is a Gabby Grove message URI.
 pub fn is_gabby_grove_v1_msg_uri(uri: &str) -> Result<bool, SsbUriError> {
     check_type_format(uri, "message", "gabbygrove-v1")
+}
+
+/// Check whether the given URI is a Buttwoo message URI.
+pub fn is_buttwoo_v1_msg_uri(uri: &str) -> Result<bool, SsbUriError> {
+    check_type_format(uri, "message", "buttwoo-v1")
 }
 
 /// Check whether the given URI is a blob URI.
@@ -271,9 +281,11 @@ pub fn is_ssb_uri(uri: &str) -> Result<bool, SsbUriError> {
     if is_classic_feed_uri(uri)?
         || is_bendy_butt_v1_feed_uri(uri)?
         || is_gabby_grove_v1_feed_uri(uri)?
+        || is_buttwoo_v1_feed_uri(uri)?
         || is_classic_msg_uri(uri)?
         || is_bendy_butt_v1_msg_uri(uri)?
         || is_gabby_grove_v1_msg_uri(uri)?
+        || is_buttwoo_v1_msg_uri(uri)?
         || is_blob_uri(uri)?
         || is_multiserver_uri(uri)?
         || is_encryption_key_box2_uri(uri)?
@@ -440,24 +452,36 @@ pub fn multiserver_address_to_uri(ms_addr: &str) -> String {
 
 /* COMPOSITION AND DECOMPOSITION FUNCTIONS */
 
-/// Compose a new URI from the given parts: `type`, `format`, `data`.
+/// Compose a new URI from the given parts: `type`, `format`, `data`, `extra_data`.
 pub fn compose_uri(parts: Parts) -> Result<String, SsbUriError> {
     parts.validate()?;
-    let Parts(type_, format, data) = parts;
+    let Parts(type_, format, data, extra_data) = parts;
     let base64_data = unsafe_to_safe_base64(&data);
+    if let Some(val) = extra_data {
+        let base64_extra_data = unsafe_to_safe_base64(&val);
+        return Ok(format!(
+            "ssb:{}/{}/{}/{}",
+            type_, format, base64_data, base64_extra_data
+        ));
+    }
     Ok(format!("ssb:{}/{}/{}", type_, format, base64_data))
 }
 
-/// Decompose the given URI into its constituent parts: `type`, `format`, `data`.
+/// Decompose the given URI into its constituent parts: `type`, `format`, `data`, `extra_data`.
 pub fn decompose_uri(uri: &str) -> Result<Parts, SsbUriError> {
     let parsed_uri = Url::parse(uri)?;
     let pathname = parsed_uri.path();
     let parts_vec: Vec<&str> = pathname.split('/').collect();
-    let parts = Parts(
+    let mut parts = Parts(
         parts_vec[0].to_string(),
         parts_vec[1].to_string(),
         safe_to_unsafe_base64(parts_vec[2]),
+        None,
     );
+    // handle the "extra_data" case
+    if parts_vec.len() == 4 {
+        parts.3 = Some(safe_to_unsafe_base64(parts_vec[3]))
+    };
     parts.validate()?;
     Ok(parts)
 }
@@ -530,6 +554,10 @@ mod tests {
         let gg_result = is_gabby_grove_v1_msg_uri(MSG_URIS[5].1);
         assert!(gg_result.is_ok());
         assert_eq!(gg_result.unwrap(), true);
+
+        let b2_result = is_buttwoo_v1_msg_uri(MSG_URIS[6].1);
+        assert!(b2_result.is_ok());
+        assert_eq!(b2_result.unwrap(), true);
     }
 
     #[test]
@@ -565,6 +593,10 @@ mod tests {
         let gg_result = is_gabby_grove_v1_feed_uri(FEED_URIS[5].1);
         assert!(gg_result.is_ok());
         assert_eq!(gg_result.unwrap(), true);
+
+        let b2_result = is_buttwoo_v1_feed_uri(FEED_URIS[6].1);
+        assert!(b2_result.is_ok());
+        assert_eq!(b2_result.unwrap(), true);
     }
 
     #[test]
@@ -656,11 +688,12 @@ mod tests {
 
     #[test]
     fn compose_works() {
-        // Parts(type, format, data)
+        // Parts(type, format, data, extra_data)
         let parts = Parts(
             "message".to_string(),
             "sha256".to_string(),
             "g3hPVPDEO1Aj/uPl0+J2NlhFB2bbFLIHlty+YuqFZ3w=".to_string(),
+            None,
         );
         let uri = compose_uri(parts);
         assert!(uri.is_ok());
@@ -671,10 +704,38 @@ mod tests {
     fn decompose_works() {
         let parts_result = decompose_uri(MSG_URIS[1].1);
         assert!(parts_result.is_ok());
-        let Parts(type_, format, data) = parts_result.unwrap();
+        let Parts(type_, format, data, _extra_data) = parts_result.unwrap();
         assert_eq!(type_, "message");
         assert_eq!(format, "sha256");
         assert_eq!(data, "g3hPVPDEO1Aj/uPl0+J2NlhFB2bbFLIHlty+YuqFZ3w=");
+    }
+
+    #[test]
+    fn compose_works_with_extra_data() {
+        // Parts(type, format, data, extra_data)
+        let parts = Parts(
+            "feed".to_string(),
+            "buttwoo-v1".to_string(),
+            "FY5OG311W4j/KPh8H9B2MZt4WSziy/p+ABkKERJdujQ=".to_string(),
+            Some("Z0rMVMDEO1Aj0uPl0/J2NlhFB2bbFLIHlty/YuqArFq=".to_string()),
+        );
+        let uri = compose_uri(parts);
+        assert!(uri.is_ok());
+        assert_eq!(uri.unwrap(), FEED_URIS[7].1)
+    }
+
+    #[test]
+    fn decompose_works_with_extra_data() {
+        let parts_result = decompose_uri(FEED_URIS[7].1);
+        assert!(parts_result.is_ok());
+        let Parts(type_, format, data, extra_data) = parts_result.unwrap();
+        assert_eq!(type_, "feed");
+        assert_eq!(format, "buttwoo-v1");
+        assert_eq!(data, "FY5OG311W4j/KPh8H9B2MZt4WSziy/p+ABkKERJdujQ=");
+        assert_eq!(
+            extra_data.as_deref(),
+            Some("Z0rMVMDEO1Aj0uPl0/J2NlhFB2bbFLIHlty/YuqArFq=").as_deref()
+        );
     }
 
     #[test]
@@ -713,6 +774,14 @@ mod tests {
     }
 
     #[test]
+    fn cannot_convert_b2_msg_to_sigil() {
+        match msg_uri_to_sigil(MSG_URIS[6].1) {
+            Err(e) => assert_eq!(e.to_string(), "uri is not type `message` and format `sha256`: ssb://message/buttwoo-v1/Z0rMVMDEO1Aj0uPl0_J2NlhFB2bbFLIHlty_YuqArFq="),
+                _ => panic!()
+        }
+    }
+
+    #[test]
     fn invalid_feed_uri_not_recognised() {
         let result = is_classic_feed_uri("ssb:feed/ed25519/");
         assert!(result.is_ok());
@@ -747,6 +816,17 @@ mod tests {
             Err(e) => assert_eq!(
                 e.to_string(),
                 "uri is not type `feed` and format `ed25519`: ssb:feed/gabbygrove-v1/FY5OG311W4j_KPh8H9B2MZt4WSziy_p-ABkKERJdujQ=",
+            ),
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn cannot_convert_b2_feed_uri_to_sigil() {
+        match feed_uri_to_sigil(FEED_URIS[6].1) {
+            Err(e) => assert_eq!(
+                e.to_string(),
+                "uri is not type `feed` and format `ed25519`: ssb:feed/buttwoo-v1/FY5OG311W4j_KPh8H9B2MZt4WSziy_p-ABkKERJdujQ=",
             ),
             _ => panic!(),
         }
